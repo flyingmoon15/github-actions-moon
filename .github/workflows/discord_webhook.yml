@@ -1,0 +1,18 @@
+name: Send Discord Webhook Every 30 Minutes
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # 매 30분마다 실행
+  workflow_dispatch:        # 수동 실행도 가능
+
+jobs:
+  send-webhook:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run webhook script
+        run: |
+          python webhook.py
