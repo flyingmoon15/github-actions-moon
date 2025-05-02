@@ -15,5 +15,4 @@ jobs:
       - name: Run webhook script
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          python webhook.py
+        run: python ./webhook.py
