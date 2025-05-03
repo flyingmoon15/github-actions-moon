@@ -1,25 +1,48 @@
-import requests
 import os
-from datetime import datetime, timedelta, timezone
+import requests
+from requests.auth import HTTPBasicAuth
 
-# KST 설정
-KST = timezone(timedelta(hours=9))
-now_kst = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
+# 시크릿 값 불러오기
+client_id = os.environ.get('BLIZZARD_CLIENT_ID')
+client_secret = os.environ.get('BLIZZARD_CLIENT_SECRET')
+discord_webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
 
-# 환경변수에서 Webhook URL 불러오기
-WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+price_threshold = 163000  # 이 가격 이하일 때 알림
 
-if not WEBHOOK_URL:
-    raise ValueError("DISCORD_WEBHOOK_URL 환경변수가 설정되지 않았습니다.")
+def get_access_token(client_id, client_secret):
+    url = 'https://oauth.battle.net/token'
+    data = {'grant_type': 'client_credentials'}
+    response = requests.post(url, data=data, auth=HTTPBasicAuth(client_id, client_secret))
+    if response.status_code == 200:
+        return response.json()['access_token']
+    return None
 
-# 디스코드 메시지 내용
-payload = {
-    "content": f"[KST] 자동 메시지 전송 시간: {now_kst}"
-}
+def get_wow_token_price(token, region='kr'):
+    url = f"https://{region}.api.blizzard.com/data/wow/token/?namespace=dynamic-{region}&locale=ko_KR"
+    headers = {'Authorization': f'Bearer {token}'}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()['price'] // 10000
+    return None
 
-# 전송
-response = requests.post(WEBHOOK_URL, json=payload)
+def send_discord_alert(price):
+    message = f"토큰 가격이 {price} 골드입니다! 지금 구매 고려하세요."
+    data = {"content": message}
+    requests.post(discord_webhook_url, json=data)
 
-# 결과 출력
-print("Status Code:", response.status_code)
-print("Response:", response.text)
+def main():
+    if not (client_id and client_secret and discord_webhook_url):
+        return  # 시크릿이 하나라도 없으면 실행 안 함
+
+    token = get_access_token(client_id, client_secret)
+    if not token:
+        return
+
+    price = get_wow_token_price(token)
+    if price is None:
+        return
+
+    if price >= price_threshold:
+        send_discord_alert(price)
+
+main()
