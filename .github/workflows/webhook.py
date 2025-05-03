@@ -7,10 +7,6 @@ client_id = os.environ.get('BLIZZARD_CLIENT_ID')
 client_secret = os.environ.get('BLIZZARD_CLIENT_SECRET')
 discord_webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
 
-print(client_id)
-print(client_secret)
-print(discord_webhook_url)
-
 price_threshold = 163000  # 이 가격 이하일 때 알림
 
 def get_access_token(client_id, client_secret):
