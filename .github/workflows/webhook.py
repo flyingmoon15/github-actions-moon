@@ -42,7 +42,7 @@ def main():
     if price is None:
         return
 
-    if price >= price_threshold:
+    if price <= price_threshold:
         send_discord_alert(price)
 
 main()
