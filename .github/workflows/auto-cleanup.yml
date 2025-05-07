@@ -6,24 +6,19 @@ on:
 jobs:
   delete-old-runs:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write  # gh run delete 에 필요
     steps:
       - name: Install GitHub CLI
         run: |
-          curl -fsSL https://github.com/cli/cli/releases/download/v2.72.0/gh_2.72.0_linux_amd64.tar.gz -o gh.tar.gz
+          curl -fsSL https://github.com/cli/cli/releases/download/v2.37.0/gh_2.37.0_linux_amd64.tar.gz -o gh.tar.gz
           tar -xzf gh.tar.gz
-          sudo cp gh_2.72.0_linux_amd64/bin/gh /usr/local/bin/gh
-
-      - name: Authenticate with GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-        run: |
-          echo "$GH_TOKEN" | gh auth login --with-token
+          sudo cp gh_2.37.0_linux_amd64/bin/gh /usr/local/bin/gh
 
       - name: Delete old workflow runs (only for specific workflow name)
         env:
           GH_REPO: ${{ github.repository }}
         run: |
-          # 워크플로 이름
           WORKFLOW_NAME="Send Discord Webhook Every 30 Minutes"
 
           echo "Getting workflow ID for: $WORKFLOW_NAME"
