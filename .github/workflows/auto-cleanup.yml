@@ -7,7 +7,7 @@ jobs:
   delete-old-runs:
     runs-on: ubuntu-latest
     permissions:
-      actions: write  # gh run delete 에 필요
+      actions: write
     steps:
       - name: Install GitHub CLI
         run: |
@@ -17,6 +17,7 @@ jobs:
 
       - name: Delete old workflow runs (only for specific workflow name)
         env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # 핵심 수정
           GH_REPO: ${{ github.repository }}
         run: |
           WORKFLOW_NAME="Send Discord Webhook Every 30 Minutes"
