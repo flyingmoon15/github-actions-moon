@@ -1,39 +1,50 @@
-name: Auto Delete Old Workflow Runs
+name: Delete Old Workflow Runs
 
 on:
   workflow_dispatch:
 
 jobs:
-  delete-old-runs:
+  cleanup:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
     steps:
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://github.com/cli/cli/releases/download/v2.37.0/gh_2.37.0_linux_amd64.tar.gz -o gh.tar.gz
-          tar -xzf gh.tar.gz
-          sudo cp gh_2.37.0_linux_amd64/bin/gh /usr/local/bin/gh
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      - name: Delete old workflow runs (only for specific workflow name)
+      - name: Set environment variables
+        run: echo "WORKFLOW_NAME=Send Discord Webhook Every 30 Minutes" >> $GITHUB_ENV
+
+      - name: Install latest GitHub CLI (gh)
+        run: |
+          sudo rm -rf /usr/bin/gh
+          curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep tag_name | cut -d '"' -f 4 | sed 's/^v//')_linux_amd64.tar.gz | tar -xz
+          sudo cp gh_*/bin/gh /usr/bin/gh
+          gh --version
+
+      - name: Authenticate with GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 핵심 수정
-          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | gh auth login --with-token
+
+      - name: Delete runs older than 1 day
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          WORKFLOW_NAME="Send Discord Webhook Every 30 Minutes"
+          workflow_id=$(gh workflow list --json name,id -q ".[] | select(.name == \"$WORKFLOW_NAME\") | .id")
+          echo "Workflow ID: $workflow_id"
 
-          echo "Getting workflow ID for: $WORKFLOW_NAME"
-          WORKFLOW_ID=$(gh workflow list --repo "$GH_REPO" --limit 100 --json name,id --jq ".[] | select(.name==\"$WORKFLOW_NAME\") | .id")
-
-          if [ -z "$WORKFLOW_ID" ]; then
-            echo "❌ Workflow not found: $WORKFLOW_NAME"
+          if [ -z "$workflow_id" ]; then
+            echo "❌ Workflow not found"
             exit 1
           fi
 
-          echo "🧹 Deleting runs older than 1 day for workflow ID: $WORKFLOW_ID"
+          echo "🧹 Deleting runs older than 1 day for workflow ID: $workflow_id"
+          runs=$(gh run list --workflow="$workflow_id" --limit 100 --json databaseId,createdAt -q '.[] | select(.createdAt < "'$(date -d '1 day ago' --iso-8601=seconds)'") | .databaseId')
 
-          gh run list --workflow "$WORKFLOW_ID" --limit 100 --json databaseId,createdAt --jq '.[] | select((now - (.createdAt | fromdateiso8601)) > (1*24*60*60)) | .databaseId' |
-          while read -r run_id; do
-            echo "Deleting run: $run_id"
-            gh run delete "$run_id" --yes
-          done
+          if [ -z "$runs" ]; then
+            echo "✅ No runs to delete."
+          else
+            for run_id in $runs; do
+              echo "Deleting run: $run_id"
+              gh run delete "$run_id" --yes
+            done
+          fi
