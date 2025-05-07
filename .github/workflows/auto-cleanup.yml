@@ -1,0 +1,33 @@
+name: Auto Delete Old Workflow Runs
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 매일 자정 UTC (한국 시간 오전 9시)
+  workflow_dispatch:     # 수동 실행도 가능
+
+jobs:
+  delete-old-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.PERSONAL_ACCESS_TOKEN }}" | gh auth login --with-token
+
+      - name: Delete Workflow Runs older than 1 day
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          gh api repos/${REPO}/actions/runs --paginate -q '.workflow_runs[] | select(.status=="completed") | [.id, .created_at]' | \
+          while read -r id created_at; do
+            # created_at이 하루 이상 지난 경우에만 삭제
+            if [[ $(date -d "$created_at" +%s) -lt $(date -d "1 day ago" +%s) ]]; then
+              echo "Deleting run ID $id (created at $created_at)"
+              gh api repos/${REPO}/actions/runs/$id -X DELETE
+            fi
+          done
