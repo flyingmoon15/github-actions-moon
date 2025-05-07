@@ -1,33 +1,41 @@
 name: Auto Delete Old Workflow Runs
 
 on:
-  schedule:
-    - cron: '0 0 * * *'  # 매일 자정 UTC (한국 시간 오전 9시)
-  workflow_dispatch:     # 수동 실행도 가능
+  workflow_dispatch:
 
 jobs:
-  delete-old-runs:
+  close-old-prs:
     runs-on: ubuntu-latest
     steps:
-      - name: Install GitHub CLI
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ✅ GitHub CLI 수동 설치 (Ubuntu 24.04 대응)
+      - name: Install GitHub CLI manually
         run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
-          sudo apt update
-          sudo apt install gh -y
+          curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_2.49.0_linux_amd64.tar.gz -o gh.tar.gz
+          tar -xzf gh.tar.gz
+          sudo cp gh_2.49.0_linux_amd64/bin/gh /usr/local/bin/gh
+          gh --version
 
-      - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.PERSONAL_ACCESS_TOKEN }}" | gh auth login --with-token
-
-      - name: Delete Workflow Runs older than 1 day
+      # ✅ GitHub CLI 인증 (PERSONAL_ACCESS_TOKEN 사용)
+      - name: Authenticate with GitHub CLI
         env:
-          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          gh api repos/${REPO}/actions/runs --paginate -q '.workflow_runs[] | select(.status=="completed") | [.id, .created_at]' | \
-          while read -r id created_at; do
-            # created_at이 하루 이상 지난 경우에만 삭제
-            if [[ $(date -d "$created_at" +%s) -lt $(date -d "1 day ago" +%s) ]]; then
-              echo "Deleting run ID $id (created at $created_at)"
-              gh api repos/${REPO}/actions/runs/$id -X DELETE
-            fi
+          echo "$GH_TOKEN" | gh auth login --with-token
+
+      # ✅ 하루 이상 지난 PR 닫기
+      - name: Close pull requests older than 1 day
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "Fetching open pull requests for $GH_REPO"
+
+          gh pr list --state open --json number,createdAt,title --jq '.[] | select((now - (.createdAt | fromdateiso8601)) > 86400)' |
+          while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            title=$(echo "$pr" | jq -r '.title')
+            echo "Closing PR #$number: $title"
+            gh pr close "$number" --comment "자동으로 닫힘: 1일 이상 열려 있음"
           done
