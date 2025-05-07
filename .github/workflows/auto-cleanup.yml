@@ -10,7 +10,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ✅ GitHub CLI 수동 설치
+      # ✅ GitHub CLI 수동 설치 (v2.72.0)
       - name: Install GitHub CLI manually
         run: |
           curl -fsSL https://github.com/cli/cli/releases/download/v2.72.0/gh_2.72.0_linux_amd64.tar.gz -o gh.tar.gz
@@ -18,16 +18,10 @@ jobs:
           sudo cp gh_2.72.0_linux_amd64/bin/gh /usr/local/bin/gh
           gh --version
 
-      # ✅ GitHub CLI 인증 (PERSONAL_ACCESS_TOKEN 사용)
-      - name: Authenticate with GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-        run: |
-          echo "$GH_TOKEN" | gh auth login --with-token
-
-      # ✅ 하루 이상 지난 PR 닫기
+      # ✅ 하루 이상 지난 PR 닫기 (GH_TOKEN으로 인증됨)
       - name: Close pull requests older than 1 day
         env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           echo "Fetching open pull requests for $GH_REPO"
