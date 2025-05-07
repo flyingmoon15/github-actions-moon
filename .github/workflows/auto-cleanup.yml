@@ -30,9 +30,9 @@ jobs:
             exit 1
           fi
 
-          echo "🧹 Deleting runs older than 3 days for workflow ID: $WORKFLOW_ID"
+          echo "🧹 Deleting runs older than 1 day for workflow ID: $WORKFLOW_ID"
 
-          gh run list --workflow "$WORKFLOW_ID" --limit 100 --json databaseId,createdAt --jq '.[] | select((now - (.createdAt | fromdateiso8601)) > (3*24*60*60)) | .databaseId' |
+          gh run list --workflow "$WORKFLOW_ID" --limit 100 --json databaseId,createdAt --jq '.[] | select((now - (.createdAt | fromdateiso8601)) > (1*24*60*60)) | .databaseId' |
           while read -r run_id; do
             echo "Deleting run: $run_id"
             gh run delete "$run_id" --yes
