@@ -25,26 +25,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          # 인증 방식 변경 - 환경 변수를 통한 직접 인증
           # 인증 상태 확인
-          gh auth status || echo "Authentication required"
+          gh auth status
           
           workflow_id=$(gh workflow list --json name,id -q ".[] | select(.name == \"$WORKFLOW_NAME\") | .id")
           echo "Workflow ID: $workflow_id"
           
           if [ -z "$workflow_id" ]; then
-            echo "❌ Workflow not found"
+            echo "Workflow not found"
             exit 1
           fi
           
-          echo "🧹 Deleting runs older than 1 day for workflow ID: $workflow_id"
+          echo "Deleting runs older than 1 day for workflow ID: $workflow_id"
           runs=$(gh run list --workflow="$workflow_id" --limit 100 --json databaseId,createdAt -q '.[] | select(.createdAt < "'$(date -d '1 day ago' --iso-8601=seconds)'") | .databaseId')
           
           if [ -z "$runs" ]; then
-            echo "✅ No runs to delete."
+            echo "No runs to delete."
           else
             for run_id in $runs; do
               echo "Deleting run: $run_id"
-              gh run delete "$run_id" --yes
+              # --yes 플래그 제거, -y로 변경하거나 또는 echo y | 사용
+              echo y | gh run delete "$run_id"
             done
           fi
