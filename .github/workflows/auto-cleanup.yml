@@ -1,45 +1,45 @@
 name: Delete Old Workflow Runs
-
 on:
   workflow_dispatch:
-
+  schedule:
+    - cron: '0 0 * * *'  # 매일 자정에 실행
+    
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-
+        
       - name: Set environment variables
         run: echo "WORKFLOW_NAME=Send Discord Webhook Every 30 Minutes" >> $GITHUB_ENV
-
+        
       - name: Install latest GitHub CLI (gh)
         run: |
           sudo rm -rf /usr/bin/gh
           curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep tag_name | cut -d '"' -f 4 | sed 's/^v//')_linux_amd64.tar.gz | tar -xz
           sudo cp gh_*/bin/gh /usr/bin/gh
           gh --version
-
-      - name: Authenticate with GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$GH_TOKEN" | gh auth login --with-token
-
+          
       - name: Delete runs older than 1 day
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
+          # 인증 방식 변경 - 환경 변수를 통한 직접 인증
+          # 인증 상태 확인
+          gh auth status || echo "Authentication required"
+          
           workflow_id=$(gh workflow list --json name,id -q ".[] | select(.name == \"$WORKFLOW_NAME\") | .id")
           echo "Workflow ID: $workflow_id"
-
+          
           if [ -z "$workflow_id" ]; then
             echo "❌ Workflow not found"
             exit 1
           fi
-
+          
           echo "🧹 Deleting runs older than 1 day for workflow ID: $workflow_id"
           runs=$(gh run list --workflow="$workflow_id" --limit 100 --json databaseId,createdAt -q '.[] | select(.createdAt < "'$(date -d '1 day ago' --iso-8601=seconds)'") | .databaseId')
-
+          
           if [ -z "$runs" ]; then
             echo "✅ No runs to delete."
           else
