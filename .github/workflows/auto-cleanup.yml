@@ -37,14 +37,55 @@ jobs:
           fi
           
           echo "Deleting runs older than 1 day for workflow ID: $workflow_id"
-          runs=$(gh run list --workflow="$workflow_id" --limit 100 --json databaseId,createdAt -q '.[] | select(.createdAt < "'$(date -d '1 day ago' --iso-8601=seconds)'") | .databaseId')
           
-          if [ -z "$runs" ]; then
-            echo "No runs to delete."
-          else
-            for run_id in $runs; do
-              echo "Deleting run: $run_id"
-              # --yes 플래그 제거, -y로 변경하거나 또는 echo y | 사용
-              echo y | gh run delete "$run_id"
-            done
-          fi
+          # 하루 전 시간을 ISO 8601 형식으로 계산
+          one_day_ago=$(date -d '1 day ago' --iso-8601=seconds)
+          echo "기준 시간: $one_day_ago"
+          
+          # 페이지네이션을 사용하여 모든 워크플로우 실행을 조회
+          page=1
+          total_deleted=0
+          
+          while true; do
+            echo "페이지 $page 조회 중..."
+            # 모든 실행을 최신순으로 조회 (각 페이지 최대 100개)
+            runs=$(gh run list --workflow="$workflow_id" --limit 100 --json databaseId,createdAt,status,conclusion -q '.[] | "\(.databaseId) \(.createdAt)"' --page $page)
+            
+            # 결과가 없으면 종료
+            if [ -z "$runs" ]; then
+              echo "더 이상 실행 결과가 없습니다."
+              break
+            fi
+            
+            deleted_count=0
+            
+            # 각 실행에 대해 생성 시간 확인 및 삭제
+            while read -r run; do
+              # 실행 ID와 생성 시간 추출
+              run_id=$(echo $run | cut -d' ' -f1)
+              created_at=$(echo $run | cut -d' ' -f2-)
+              
+              # 생성 시간이 하루 이상 지났는지 확인
+              if [[ "$created_at" < "$one_day_ago" ]]; then
+                echo "삭제 중: $run_id (생성 시간: $created_at)"
+                echo y | gh run delete "$run_id"
+                deleted_count=$((deleted_count + 1))
+                total_deleted=$((total_deleted + 1))
+              else
+                echo "유지: $run_id (생성 시간: $created_at)"
+              fi
+            done <<< "$runs"
+            
+            echo "현재 페이지에서 $deleted_count개 실행 삭제됨"
+            
+            # 현재 페이지에서 삭제한 항목이 없으면 더 오래된 항목도 없을 것이므로 종료
+            if [ $deleted_count -eq 0 ]; then
+              echo "더 이상 삭제할 항목이 없습니다."
+              break
+            fi
+            
+            # 다음 페이지로
+            page=$((page + 1))
+          done
+          
+          echo "총 $total_deleted개의 오래된 워크플로우 실행이 삭제되었습니다."
