@@ -7,7 +7,7 @@ client_id = os.environ.get('BLIZZARD_CLIENT_ID')
 client_secret = os.environ.get('BLIZZARD_CLIENT_SECRET')
 discord_webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
 
-price_threshold = 170000  # 이 가격 이하일 때 알림
+price_threshold = 160000  # 이 가격 이하일 때 알림
 
 def get_access_token(client_id, client_secret):
     url = 'https://oauth.battle.net/token'
